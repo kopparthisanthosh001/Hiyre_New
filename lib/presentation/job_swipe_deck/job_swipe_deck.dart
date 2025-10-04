@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:sizer/sizer.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/job_model.dart';
 import '../../services/job_service.dart';
@@ -9,6 +10,7 @@ import '../../widgets/custom_bottom_bar.dart';
 import './widgets/job_details_modal.dart';
 import './widgets/swipe_action_buttons.dart';
 import './widgets/swipe_card_stack.dart';
+import './widgets/signup_modal.dart';
 import '../authentication/job_seeker_login_screen.dart';
 
 class JobSwipeDeck extends StatefulWidget {
@@ -33,9 +35,7 @@ class _JobSwipeDeckState extends State<JobSwipeDeck>
   List<Map<String, dynamic>> _jobsData = [];
   List<String>? _selectedDomainIds;
   
-  // Swipe tracking for authentication trigger
-  int _swipeCount = 0;
-  static const int _swipesBeforeAuth = 3;
+  // Removed swipe tracking for authentication trigger - now allowing unlimited swipes
 
   @override
   void initState() {
@@ -166,118 +166,87 @@ class _JobSwipeDeckState extends State<JobSwipeDeck>
   }
 
   String _generateMatchReason(JobModel job) {
-    // Fallback method for when match reason is not calculated by job service
-    final reasons = [
-      'Your experience aligns well with this ${job.domain?.name ?? 'role'} position.',
-      'Your skills match the requirements for this ${job.title} role.',
-      'This position offers growth opportunities in ${job.domain?.name ?? 'your field'}.',
-      'The ${job.workMode} work mode matches your preferences.',
-      'Your ${job.experienceLevel} level experience is perfect for this role.',
-    ];
-
-    return reasons[job.id.hashCode % reasons.length];
+    // Simple match reason generation based on job data
+    final reasons = <String>[];
+    
+    if (job.workMode == 'Remote') {
+      reasons.add('Remote work available');
+    }
+    if (job.experienceLevel == 'Entry Level') {
+      reasons.add('Entry level position');
+    }
+    if (job.employmentType == 'Full-time') {
+      reasons.add('Full-time opportunity');
+    }
+    
+    return reasons.isNotEmpty ? reasons.join(', ') : 'Good match for your profile';
   }
 
   void _handleSwipeRight(Map<String, dynamic> job) {
     setState(() {
-      _appliedJobs.add(job);
       _lastSwipedJob = job;
+      _appliedJobs.add(job);
       _jobsData.removeWhere((j) => j['id'] == job['id']);
-      _swipeCount++;
     });
 
-    // Apply to job in database
-    _applyToJob(job['id'].toString());
-
-    Fluttertoast.showToast(
-      msg: "Applied to ${job['title']}! (Swipe $_swipeCount/3)",
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.green,
-      textColor: Colors.white,
-    );
+    final currentUser = AuthService.instance.currentUser;
     
-    // Check if user needs to authenticate after 3 swipes
-    _checkAuthenticationRequired();
+    if (currentUser != null) {
+      _applyToJob(job['id'].toString());
+      Fluttertoast.showToast(
+        msg: "Applied to ${job['title']}!",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+      );
+    } else {
+      // For unauthenticated users, just show interest message
+      Fluttertoast.showToast(
+        msg: "Interested in ${job['title']}! Sign in to apply",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.blue,
+        textColor: Colors.white,
+      );
+    }
   }
 
   void _handleSwipeLeft(Map<String, dynamic> job) {
     setState(() {
       _lastSwipedJob = job;
       _jobsData.removeWhere((j) => j['id'] == job['id']);
-      _swipeCount++;
     });
 
     Fluttertoast.showToast(
-      msg: "Job skipped (Swipe $_swipeCount/3)",
+      msg: "Job skipped",
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
       backgroundColor: Colors.grey[600],
       textColor: Colors.white,
     );
-    
-    // Check if user needs to authenticate after 3 swipes
-    _checkAuthenticationRequired();
   }
 
   Future<void> _applyToJob(String jobId) async {
     try {
       await JobService.instance.applyToJob(jobId: jobId);
-    } catch (error) {
-      // Silently handle error - user already got feedback via toast
-      print('Error applying to job: $error');
+    } catch (e) {
+      print('Error applying to job: $e');
     }
   }
-  
-  Future<void> _checkAuthenticationRequired() async {
-    // Check if user has swiped 3 jobs and is not authenticated
-    if (_swipeCount >= _swipesBeforeAuth) {
-      final currentUser = AuthService.instance.currentUser;
-      
-      if (currentUser == null) {
-        // User is not authenticated, show login screen
-        final result = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const JobSeekerLoginScreen(),
-            fullscreenDialog: true,
-          ),
-        );
-        
-        if (result == true) {
-          // User successfully logged in, reset swipe count
-          setState(() {
-            _swipeCount = 0;
-          });
-          
-          Fluttertoast.showToast(
-            msg: "Welcome! Continue swiping to find your perfect job.",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.green,
-            textColor: Colors.white,
-          );
-        } else {
-          // User cancelled login, reset swipe count but show message
-          setState(() {
-            _swipeCount = 0;
-          });
-          
-          Fluttertoast.showToast(
-            msg: "Sign in to save your job preferences and applications.",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.orange,
-            textColor: Colors.white,
-          );
-        }
-      } else {
-        // User is already authenticated, reset counter
-        setState(() {
-          _swipeCount = 0;
-        });
-      }
-    }
+
+  // Removed _checkAuthenticationRequired method as we no longer need swipe count authentication
+
+  void _navigateToPreferences() {
+    // Navigate to profile creation preferences tab
+    Navigator.pushNamed(
+      context,
+      '/profile-creation',
+      arguments: {
+        'initialTab': 1, // Preferences tab
+        'fromSignup': true,
+      },
+    );
   }
 
   void _handleCardTap(Map<String, dynamic> job) {
@@ -397,16 +366,12 @@ class _JobSwipeDeckState extends State<JobSwipeDeck>
           SizedBox(height: 2.h),
           Text(
             'No jobs available',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey[600]),
           ),
           SizedBox(height: 1.h),
           Text(
             'Check back later for new opportunities',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.grey[500]),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[500]),
           ),
         ],
       ),

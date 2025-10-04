@@ -235,14 +235,20 @@ class JobService {
           .from('job_applications')
           .select('''
             *,
-            job:jobs(
+            jobs(
               id,
               title,
               description,
-              company:companies(name, logo_url)
+              location,
+              employment_type,
+              work_mode,
+              salary_min,
+              salary_max,
+              companies(name, logo_url)
             )
           ''')
-          .eq('applicant_id', user.id);
+          .eq('applicant_id', user.id)
+          .order('applied_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e, stack) {

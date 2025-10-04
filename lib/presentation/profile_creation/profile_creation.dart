@@ -7,11 +7,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_export.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
+import '../../services/resume_parser_service.dart';
 import './widgets/experience_section_widget.dart';
 import './widgets/preferences_section_widget.dart';
 import './widgets/profile_photo_widget.dart';
 import './widgets/resume_upload_widget.dart';
 import './widgets/skills_input_widget.dart';
+import '../job_swipe_deck/widgets/signup_modal.dart';
 
 class ProfileCreation extends StatefulWidget {
   const ProfileCreation({super.key});
@@ -22,12 +24,13 @@ class ProfileCreation extends StatefulWidget {
 
 class _ProfileCreationState extends State<ProfileCreation>
     with TickerProviderStateMixin {
-  final PageController _pageController = PageController();
+  late PageController _pageController;
   late TabController _tabController;
   int _currentStep = 0;
   bool _isLoading = false;
+  bool _fromSignup = false;
 
-  // Profile data
+  // Controllers for form fields
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -44,18 +47,32 @@ class _ProfileCreationState extends State<ProfileCreation>
   double _maxSalary = 1500000;
   bool _remoteWork = true;
   PlatformFile? _resumeFile;
+  ParsedResumeData? _parsedResumeData;
+  List<String>? _selectedDomainIds;
 
-  final List<String> _stepTitles = [
-    'Personal Info',
-    'Skills',
-    'Experience',
-    'Preferences',
-    'Resume',
-  ];
+  List<String> get _stepTitles {
+    if (_fromSignup) {
+      // When coming from resume upload, exclude the resume step
+      return [
+        'Personal Info',
+        'Skills',
+        'Experience',
+        'Preferences',
+      ];
+    }
+    return [
+      'Personal Info',
+      'Skills',
+      'Experience',
+      'Preferences',
+      'Resume',
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _tabController = TabController(length: _stepTitles.length, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
@@ -69,6 +86,121 @@ class _ProfileCreationState extends State<ProfileCreation>
         );
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Check if parsed resume data was passed as arguments
+    final args = ModalRoute.of(context)?.settings.arguments;
+    
+    // Handle different argument types
+    if (args is ParsedResumeData && _parsedResumeData == null) {
+      _parsedResumeData = args;
+      _populateFieldsFromResumeData();
+    } else if (args is Map<String, dynamic>) {
+      // Handle navigation from signup flow
+      final initialTab = args['initialTab'] as int?;
+      final fromSignup = args['fromSignup'] as bool? ?? false;
+      final selectedDomainIds = args['selectedDomainIds'] as List<String>?;
+      
+      // Set the _fromSignup flag
+      _fromSignup = fromSignup;
+      _selectedDomainIds = selectedDomainIds;
+      
+      if (initialTab != null && fromSignup) {
+        // Navigate to the specified tab (Preferences tab = index 3)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setState(() {
+            _currentStep = initialTab == 1 ? 3 : initialTab; // Map preferences tab correctly
+          });
+          _tabController.animateTo(_currentStep);
+          _pageController.animateToPage(
+            _currentStep,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        });
+      }
+    }
+  }
+
+  void _populateFieldsFromResumeData() {
+    if (_parsedResumeData?.personalInfo != null) {
+      final personalInfo = _parsedResumeData!.personalInfo!;
+      
+      // Split full name into first and last name
+      if (personalInfo.fullName != null) {
+        final nameParts = personalInfo.fullName!.split(' ');
+        if (nameParts.isNotEmpty) {
+          _firstNameController.text = nameParts.first;
+          if (nameParts.length > 1) {
+            _lastNameController.text = nameParts.sublist(1).join(' ');
+          }
+        }
+      }
+      
+      // Populate other fields
+      if (personalInfo.email != null) {
+        _emailController.text = personalInfo.email!;
+      }
+      if (personalInfo.phone != null) {
+        _phoneController.text = personalInfo.phone!;
+      }
+      
+      // Generate bio from parsed data
+      _bioController.text = _generateBioFromParsedData(_parsedResumeData!);
+    }
+    
+    // Populate skills
+    if (_parsedResumeData?.skills != null) {
+      _selectedSkills = List.from(_parsedResumeData!.skills!);
+    }
+    
+    // Populate experiences
+    if (_parsedResumeData?.workExperiences != null) {
+      _experiences = _parsedResumeData!.workExperiences!.map((exp) => 
+        ExperienceItem(
+          jobTitle: exp.jobTitle ?? '',
+          company: exp.companyName ?? '',
+          startDate: exp.startDate != null ? DateTime.tryParse(exp.startDate!) : null,
+          endDate: exp.endDate != null ? DateTime.tryParse(exp.endDate!) : null,
+          isCurrentJob: exp.isCurrentJob ?? false,
+          description: exp.description ?? '',
+        )
+      ).toList();
+    }
+    
+    setState(() {});
+  }
+
+  String _generateBioFromParsedData(ParsedResumeData parsedData) {
+    List<String> bioParts = [];
+    
+    if (parsedData.workExperiences?.isNotEmpty ?? false) {
+      final latestJob = parsedData.workExperiences!.first;
+      if (latestJob.jobTitle?.isNotEmpty ?? false) {
+        bioParts.add('${latestJob.jobTitle}');
+      }
+      if (latestJob.companyName?.isNotEmpty ?? false) {
+        bioParts.add('at ${latestJob.companyName}');
+      }
+    }
+    
+    if (parsedData.skills?.isNotEmpty ?? false) {
+      final topSkills = parsedData.skills!.take(3).join(', ');
+      bioParts.add('Skilled in $topSkills');
+    }
+    
+    if (parsedData.education?.isNotEmpty ?? false) {
+       final education = parsedData.education!.first;
+       if (education.degree?.isNotEmpty ?? false) {
+         bioParts.add('${education.degree}');
+       }
+     }
+    
+    return bioParts.join('. ').trim();
   }
 
   @override
@@ -86,17 +218,16 @@ class _ProfileCreationState extends State<ProfileCreation>
   bool _isStepValid(int step) {
     switch (step) {
       case 0: // Personal Info
-        return _firstNameController.text.isNotEmpty &&
-            _lastNameController.text.isNotEmpty &&
-            _emailController.text.isNotEmpty &&
-            _phoneController.text.isNotEmpty;
-      case 1: // Skills
+        return _firstNameController.text.trim().isNotEmpty &&
+               _lastNameController.text.trim().isNotEmpty &&
+               _emailController.text.trim().isNotEmpty;
+      case 1: // Skills & Certifications
         return _selectedSkills.isNotEmpty;
-      case 2: // Experience
-        return true; // Experience is optional
+      case 2: // Work Experience - Optional but can be pre-filled from resume
+        return true;
       case 3: // Preferences
-        return _preferredRoles.isNotEmpty && _workModes.isNotEmpty;
-      case 4: // Resume
+        return _preferredRoles.isNotEmpty && _preferredLocations.isNotEmpty;
+      case 4: // Resume Upload
         return true; // Resume is optional
       default:
         return false;
@@ -142,6 +273,12 @@ class _ProfileCreationState extends State<ProfileCreation>
   }
 
   Future<void> _completeProfile() async {
+    // Check if this is a post-signup preferences flow
+    if (_fromSignup) {
+      await _completePostSignupPreferences();
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -176,6 +313,11 @@ class _ProfileCreationState extends State<ProfileCreation>
           skills: _selectedSkills.isNotEmpty ? _selectedSkills : null,
         );
         
+        // If we have parsed resume data, save work experience and education
+        if (_parsedResumeData != null) {
+          await _saveResumeData(authResponse.user!.id);
+        }
+        
         if (mounted) {
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
@@ -194,8 +336,14 @@ class _ProfileCreationState extends State<ProfileCreation>
             ),
           );
 
-          // Navigate to job swipe deck
-          Navigator.pushReplacementNamed(context, '/job-swipe-deck');
+          // Navigate to job swipe deck with domain filtering
+          Navigator.pushReplacementNamed(
+            context, 
+            '/job-swipe-deck',
+            arguments: {
+              'selectedDomainIds': _selectedDomainIds,
+            },
+          );
         }
       }
     } catch (error) {
@@ -208,6 +356,107 @@ class _ProfileCreationState extends State<ProfileCreation>
           SnackBar(
             content: Text(
               'Failed to create profile: $error',
+              style: GoogleFonts.inter(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _completePostSignupPreferences() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = AuthService.instance.currentUser;
+      
+      // If user is not authenticated, show signup modal first
+      if (user == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        await _showSignupModal();
+        return;
+      }
+
+      // Validate that preferences are selected
+      if (_preferredRoles.isEmpty || _preferredLocations.isEmpty) {
+        throw Exception('Please select at least one preferred role and location');
+      }
+
+      // Update user preferences
+      final Map<String, dynamic> updates = {};
+      
+      // Add preferred locations
+      if (_preferredLocations.isNotEmpty) {
+        updates['location'] = _preferredLocations.first;
+      }
+      
+      // Add preferred roles (from skills selection)
+      if (_selectedSkills.isNotEmpty) {
+        updates['skills'] = _selectedSkills;
+      }
+      
+      // Add work mode preference (you might need to add this field to your preferences tab)
+      // For now, we'll use a default or you can add this field later
+      
+      // Add salary expectation (you might need to add this field to your preferences tab)
+      // For now, we'll use a default or you can add this field later
+
+      if (updates.isNotEmpty) {
+        await AuthService.instance.updateUserProfile(updates: updates);
+      }
+
+      if (mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Preferences updated! Finding jobs that match your profile...',
+              style: GoogleFonts.inter(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: AppTheme.lightTheme.colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+
+        // Navigate to job swipe deck with filtered jobs
+        Navigator.pushReplacementNamed(
+          context, 
+          '/job-swipe-deck',
+          arguments: {
+            'selectedDomainIds': _selectedDomainIds,
+          },
+        );
+      }
+    } catch (error) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to update preferences: $error',
               style: GoogleFonts.inter(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w500,
@@ -456,6 +705,18 @@ class _ProfileCreationState extends State<ProfileCreation>
   }
 
   Widget _buildContent() {
+    List<Widget> children = [
+      _buildPersonalInfoStep(),
+      _buildSkillsStep(),
+      _buildExperienceStep(),
+      _buildPreferencesStep(),
+    ];
+    
+    // Only add resume step if not coming from signup
+    if (!_fromSignup) {
+      children.add(_buildResumeStep());
+    }
+    
     return PageView(
       controller: _pageController,
       onPageChanged: (index) {
@@ -464,13 +725,7 @@ class _ProfileCreationState extends State<ProfileCreation>
         });
         _tabController.animateTo(index);
       },
-      children: [
-        _buildPersonalInfoStep(),
-        _buildSkillsStep(),
-        _buildExperienceStep(),
-        _buildPreferencesStep(),
-        _buildResumeStep(),
-      ],
+      children: children,
     );
   }
 
@@ -816,5 +1071,95 @@ class _ProfileCreationState extends State<ProfileCreation>
         ),
       ),
     );
+  }
+
+  Future<void> _saveResumeData(String userId) async {
+    if (_parsedResumeData == null) return;
+    
+    try {
+      // Save work experiences
+      if (_parsedResumeData!.workExperiences?.isNotEmpty ?? false) {
+        for (WorkExperience exp in _parsedResumeData!.workExperiences!) {
+          if (exp.jobTitle != null && exp.companyName != null) {
+            await ProfileService.instance.addWorkExperience(
+              jobTitle: exp.jobTitle!,
+              companyName: exp.companyName!,
+              location: '',
+              employmentType: 'full_time',
+              startDate: DateTime.now(),
+              endDate: null,
+              currentlyWorking: exp.isCurrentJob ?? false,
+              responsibilities: exp.description ?? '',
+            );
+          }
+        }
+      }
+      
+      // Save education
+      if (_parsedResumeData!.education?.isNotEmpty ?? false) {
+        for (Education edu in _parsedResumeData!.education!) {
+          if (edu.degree != null && edu.institution != null) {
+            await ProfileService.instance.addEducation(
+              degree: edu.degree!,
+              fieldOfStudy: edu.fieldOfStudy ?? '',
+              institution: edu.institution!,
+              location: '',
+              graduationYear: DateTime.now().year.toString(),
+              achievements: '',
+            );
+          }
+        }
+      }
+      
+      // Save certifications
+      if (_parsedResumeData!.certifications?.isNotEmpty ?? false) {
+        for (String cert in _parsedResumeData!.certifications!) {
+          await ProfileService.instance.addCertification(
+            name: cert,
+            issuingOrganization: 'Unknown',
+            issueDate: DateTime.now().toString(),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error saving resume data: $e');
+      // Don't throw error as this is supplementary data
+    }
+  }
+
+  Future<void> _showSignupModal() async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SignupModal(
+        jobTitle: 'your preferred roles',
+        companyName: 'companies in your domain',
+        onSignupSuccess: () {
+          // After successful signup, continue with preferences completion
+          _completePostSignupPreferences();
+        },
+      ),
+    );
+    
+    // If user dismissed the modal without signing up, they can't proceed
+    if (result != true) {
+      // Optionally show a message or navigate back
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please sign up to continue and see job recommendations',
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 }

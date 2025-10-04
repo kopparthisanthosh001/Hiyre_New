@@ -26,6 +26,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserProfile();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh profile data when screen becomes active (e.g., after signup)
+    print('🔄 Profile screen dependencies changed - refreshing profile data');
+    _loadUserProfile();
+  }
+
   Future<void> _loadUserProfile() async {
     try {
       setState(() {
@@ -33,45 +41,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
 
       final userId = AuthService.instance.currentUser?.id;
+      print('🔍 Loading profile for user ID: ${userId ?? "null"}');
+      
       if (userId == null) {
-        // User not logged in, show mock profile
-        _userProfile = {
-          'first_name': 'John',
-          'last_name': 'Doe',
-          'email': 'john.doe@example.com',
-          'phone': '+91 98765 43210',
-          'bio': 'Passionate Flutter developer with 4+ years of experience in mobile app development.',
-          'experience_level': 'senior',
-          'location': 'Mumbai, India',
-        };
-        _userSkills = ['Flutter', 'Dart', 'Firebase', 'Mobile Development', 'UI/UX Design'];
-        _userDomains = ['Technology', 'Mobile Development'];
-        _userPreferences = {
-          'preferred_work_modes': ['remote', 'hybrid'],
-          'preferred_employment_types': ['full_time'],
-          'preferred_locations': ['Mumbai', 'Bangalore', 'Remote'],
-          'min_salary': 800000,
-          'max_salary': 1500000,
-        };
+        print('⚠️ No authenticated user - showing empty profile');
+        // User not logged in, show empty profile
+        _userProfile = null;
+        _userSkills = [];
+        _userDomains = [];
+        _userPreferences = null;
       } else {
+        print('📊 Loading actual user profile from database');
         // Load actual user profile from database
         _userProfile = await ProfileService.instance.getUserProfile();
+        print('✅ Profile loaded: ${_userProfile?['full_name'] ?? "No name"}');
+        
+        // If profile is empty or incomplete, show appropriate message
+        if (_userProfile == null || _userProfile!.isEmpty) {
+          print('⚠️ Profile is empty - user needs to complete profile');
+        }
+        
         // Load additional profile data...
+        _userSkills = _userProfile?['skills'] ?? [];
+        _userDomains = _userProfile?['domains'] ?? [];
+        _userPreferences = _userProfile?['preferences'];
       }
     } catch (error) {
-      print('Error loading user profile: $error');
-      // Show mock profile on error
-      _userProfile = {
-        'first_name': 'John',
-        'last_name': 'Doe',
-        'email': 'john.doe@example.com',
-        'phone': '+91 98765 43210',
-        'bio': 'Passionate Flutter developer with 4+ years of experience.',
-        'experience_level': 'senior',
-        'location': 'Mumbai, India',
-      };
-      _userSkills = ['Flutter', 'Dart', 'Firebase', 'Mobile Development'];
-      _userDomains = ['Technology'];
+      print('❌ Error loading user profile: $error');
+      // Show empty profile on error instead of mock data
+      _userProfile = null;
+      _userSkills = [];
+      _userDomains = [];
+      _userPreferences = null;
     } finally {
       setState(() {
         _isLoading = false;
@@ -183,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Name
           Text(
-            '${_userProfile?['first_name'] ?? 'John'} ${_userProfile?['last_name'] ?? 'Doe'}',
+            _userProfile?['full_name'] ?? 'Complete your profile',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: Colors.green.shade800,
@@ -193,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Email
           Text(
-            _userProfile?['email'] ?? 'john.doe@example.com',
+            _userProfile?['email'] ?? 'Add your email address',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: Colors.green.shade700,
             ),
@@ -207,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Icon(Icons.location_on, size: 16, color: Colors.green.shade600),
               SizedBox(width: 1.w),
               Text(
-                _userProfile?['location'] ?? 'Mumbai, India',
+                _userProfile?['location'] ?? 'Add location',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: Colors.green.shade600,
                 ),
@@ -216,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Icon(Icons.work, size: 16, color: Colors.green.shade600),
               SizedBox(width: 1.w),
               Text(
-                '${_userProfile?['experience_level'] ?? 'Senior'} Level',
+                '${_userProfile?['experience_level'] ?? 'Add experience'} Level',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: Colors.green.shade600,
                 ),
@@ -438,6 +439,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         
         _buildSettingItem(theme, 'Edit Profile', Icons.edit, () {
           Navigator.pushNamed(context, '/profile-creation');
+        }),
+        _buildSettingItem(theme, 'Change Domain', Icons.domain, () {
+          Navigator.pushNamed(context, '/domain-selection');
         }),
         _buildSettingItem(theme, 'Notification Settings', Icons.notifications, () {}),
         _buildSettingItem(theme, 'Privacy Settings', Icons.privacy_tip, () {}),

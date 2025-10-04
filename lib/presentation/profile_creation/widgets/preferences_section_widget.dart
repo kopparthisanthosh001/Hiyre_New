@@ -155,7 +155,10 @@ class _PreferencesSectionWidgetState extends State<PreferencesSectionWidget> {
     required ScrollController scrollController,
   }) {
     return StatefulBuilder(
-      builder: (context, setState) {
+      builder: (context, setModalState) {
+        // Create a local copy of selected items for immediate UI updates
+        List<String> localSelectedItems = List.from(selectedItems);
+        
         return Container(
           padding: EdgeInsets.all(4.w),
           child: Column(
@@ -185,31 +188,65 @@ class _PreferencesSectionWidgetState extends State<PreferencesSectionWidget> {
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    final isSelected = selectedItems.contains(item);
+                    final isSelected = localSelectedItems.contains(item);
 
-                    return CheckboxListTile(
-                      title: Text(
-                        item,
-                        style: GoogleFonts.inter(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w400,
-                          color: AppTheme.lightTheme.colorScheme.onSurface,
+                    return Container(
+                      margin: EdgeInsets.symmetric(vertical: 0.5.h),
+                      child: InkWell(
+                        onTap: () {
+                          setModalState(() {
+                            if (isSelected) {
+                              localSelectedItems.remove(item);
+                            } else {
+                              localSelectedItems.add(item);
+                            }
+                            // Update parent state immediately
+                            onSelectionChanged(List.from(localSelectedItems));
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 4.w,
+                            vertical: 1.5.h,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppTheme.lightTheme.colorScheme.primary
+                                  : AppTheme.lightTheme.colorScheme.outline
+                                      .withValues(alpha: 0.3),
+                              width: isSelected ? 2 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color: isSelected
+                                ? AppTheme.lightTheme.colorScheme.primary
+                                    .withValues(alpha: 0.1)
+                                : Colors.transparent,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w400,
+                                    color: isSelected
+                                        ? AppTheme.lightTheme.colorScheme.primary
+                                        : AppTheme.lightTheme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(
+                                  Icons.check_circle,
+                                  color: AppTheme.lightTheme.colorScheme.primary,
+                                  size: 20.sp,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                      value: isSelected,
-                      activeColor: AppTheme.lightTheme.colorScheme.primary,
-                      checkColor: Colors.white,
-                      onChanged: (value) {
-                        setState(() {
-                          List<String> updatedList = [...selectedItems];
-                          if (value == true) {
-                            updatedList.add(item);
-                          } else {
-                            updatedList.remove(item);
-                          }
-                          onSelectionChanged(updatedList);
-                        });
-                      },
                     );
                   },
                 ),

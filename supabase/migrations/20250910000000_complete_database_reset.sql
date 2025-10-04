@@ -24,6 +24,10 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255),
     phone VARCHAR(20),
+    bio TEXT,
+    location VARCHAR(255),
+    profile_completed BOOLEAN DEFAULT false,
+    profile_completion_step INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

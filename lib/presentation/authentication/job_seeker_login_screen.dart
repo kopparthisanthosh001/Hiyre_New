@@ -106,6 +106,10 @@ class _JobSeekerLoginScreenState extends State<JobSeekerLoginScreen> {
     Navigator.pushNamed(context, '/profile-creation');
   }
 
+  void _navigateToSignUpWithResume() {
+    Navigator.pushNamed(context, '/signup-with-resume');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -292,9 +296,51 @@ class _JobSeekerLoginScreenState extends State<JobSeekerLoginScreen> {
                         ),
                       ),
                       
+                      SizedBox(height: 3.h),
+                      
+                      // Sign up with resume button (NEW)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 6.h,
+                        child: ElevatedButton(
+                          onPressed: _navigateToSignUpWithResume,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            elevation: 4,
+                            shadowColor: Colors.black.withOpacity(0.2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.upload_file,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 2.w),
+                              Text(
+                                'Sign up with Resume',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
                       SizedBox(height: 2.h),
                       
-                      // Sign up link
+                      // Regular sign up link
                       GestureDetector(
                         onTap: _navigateToSignUp,
                         child: RichText(

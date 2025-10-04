@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../services/domain_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/profile_service.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import './widgets/domain_card_widget.dart';
 
@@ -106,12 +108,12 @@ class _DomainSelectionState extends State<DomainSelection> {
           _isLoading = false;
         });
 
-        print('🚀 Navigating to job swipe deck with domains: $domainIds');
+        print('🚀 Navigating to resume upload with domains: $domainIds');
         
-        // Navigate to job swipe deck with selected domain IDs
+        // Navigate to resume upload with selected domain IDs
         Navigator.pushNamed(
           context,
-          '/job-swipe-deck',
+          '/resume-upload',
           arguments: {'selectedDomainIds': domainIds},
         );
       }
@@ -135,7 +137,17 @@ class _DomainSelectionState extends State<DomainSelection> {
 
   Future<void> _saveUserDomainPreferences(List<String> domainIds) async {
     try {
-      await DomainService.instance.saveUserDomains(domainIds);
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      // Save domains to user profile using AuthService
+      await AuthService.instance.updateUserProfile(
+        updates: {'selected_domains': domainIds},
+      );
+      
+      print('✅ Domains saved to user profile: $domainIds');
     } catch (error) {
       // Re-throw the error so we can handle it properly in _onNext
       throw Exception('Failed to save user domains: $error');

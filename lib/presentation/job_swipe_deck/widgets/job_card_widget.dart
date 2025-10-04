@@ -30,11 +30,15 @@ class JobCardWidget extends StatelessWidget {
         (jobData['skills'] as List?)?.cast<String>().take(3).toList() ??
         [];
 
+    // Determine if this is a small screen
+    final isSmallScreen = MediaQuery.of(context).size.height < 700;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: MediaQuery.of(context).size.width < 400 ? 88.w : 90.w,
-        height: MediaQuery.of(context).size.height < 700 ? 70.h : 78.h,
+        width: screenWidth < 400 ? 88.w : 90.w,
+        height: isSmallScreen ? 68.h : 75.h, // Reduced height to prevent overflow
         margin: EdgeInsets.symmetric(horizontal: 2.w),
         decoration: BoxDecoration(
           // Changed to green color theme as requested
@@ -58,13 +62,13 @@ class JobCardWidget extends StatelessWidget {
           children: [
             // Header with company logo and match badge
             Container(
-              padding: EdgeInsets.all(4.w),
+              padding: EdgeInsets.all(isSmallScreen ? 3.w : 4.w),
               child: Row(
                 children: [
                   // Company logo
                   Container(
-                    width: 12.w,
-                    height: 12.w,
+                    width: isSmallScreen ? 10.w : 12.w,
+                    height: isSmallScreen ? 10.w : 12.w,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: Colors.white,
@@ -80,8 +84,8 @@ class JobCardWidget extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       child: CustomImageWidget(
                         imageUrl: jobData['companyLogo'] as String? ?? '',
-                        width: 12.w,
-                        height: 12.w,
+                        width: isSmallScreen ? 10.w : 12.w,
+                        height: isSmallScreen ? 10.w : 12.w,
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -90,7 +94,7 @@ class JobCardWidget extends StatelessWidget {
                   // Match percentage badge
                   Container(
                     padding:
-                        EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+                        EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.8.h),
                     decoration: BoxDecoration(
                       color: matchColor,
                       borderRadius: BorderRadius.circular(20),
@@ -101,7 +105,7 @@ class JobCardWidget extends StatelessWidget {
                         CustomIconWidget(
                           iconName: 'star',
                           color: Colors.white,
-                          size: 16,
+                          size: 14,
                         ),
                         SizedBox(width: 1.w),
                         Text(
@@ -118,10 +122,10 @@ class JobCardWidget extends StatelessWidget {
               ),
             ),
 
-            // Job details
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4.w),
+            // Job details - Use Flexible instead of Expanded to prevent overflow
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 3.w : 4.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -131,11 +135,12 @@ class JobCardWidget extends StatelessWidget {
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: Colors.green.shade800,
+                        fontSize: isSmallScreen ? 18 : null,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 0.5.h : 1.h),
+                    SizedBox(height: isSmallScreen ? 0.3.h : 0.5.h),
 
                     // Company name
                     Text(
@@ -143,16 +148,17 @@ class JobCardWidget extends StatelessWidget {
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.green.shade700,
                         fontWeight: FontWeight.w600,
+                        fontSize: isSmallScreen ? 14 : null,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 1.h : 2.h),
+                    SizedBox(height: isSmallScreen ? 0.8.h : 1.5.h),
 
-                    // SALARY SECTION - More prominent display
+                    // SALARY SECTION - Compact design
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.all(3.w),
+                      padding: EdgeInsets.all(isSmallScreen ? 2.5.w : 3.w),
                       decoration: BoxDecoration(
                         color: Colors.green.shade100,
                         borderRadius: BorderRadius.circular(16),
@@ -164,7 +170,7 @@ class JobCardWidget extends StatelessWidget {
                       child: Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(1.5.w),
+                            padding: EdgeInsets.all(isSmallScreen ? 1.w : 1.5.w),
                             decoration: BoxDecoration(
                               color: Colors.green.shade600,
                               borderRadius: BorderRadius.circular(10),
@@ -172,10 +178,10 @@ class JobCardWidget extends StatelessWidget {
                             child: CustomIconWidget(
                               iconName: 'currency_rupee',
                               color: Colors.white,
-                              size: 20,
+                              size: isSmallScreen ? 16 : 20,
                             ),
                           ),
-                          SizedBox(width: 3.w),
+                          SizedBox(width: 2.5.w),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,17 +191,19 @@ class JobCardWidget extends StatelessWidget {
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: Colors.green.shade700,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 11 : null,
                                   ),
                                 ),
-                                SizedBox(height: 0.5.h),
+                                SizedBox(height: 0.2.h),
                                 Text(
                                   jobData['salary'] as String? ??
                                       'Not disclosed',
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     color: Colors.green.shade800,
                                     fontWeight: FontWeight.w700,
+                                    fontSize: isSmallScreen ? 12 : null,
                                   ),
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
@@ -204,12 +212,12 @@ class JobCardWidget extends StatelessWidget {
                         ],
                       ),
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 1.h : 2.h),
+                    SizedBox(height: isSmallScreen ? 0.8.h : 1.5.h),
 
-                    // LOCATION SECTION - More prominent display
+                    // LOCATION SECTION - Compact design
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.all(3.w),
+                      padding: EdgeInsets.all(isSmallScreen ? 2.5.w : 3.w),
                       decoration: BoxDecoration(
                         color: Colors.green.shade100,
                         borderRadius: BorderRadius.circular(16),
@@ -221,7 +229,7 @@ class JobCardWidget extends StatelessWidget {
                       child: Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(1.5.w),
+                            padding: EdgeInsets.all(isSmallScreen ? 1.w : 1.5.w),
                             decoration: BoxDecoration(
                               color: Colors.green.shade600,
                               borderRadius: BorderRadius.circular(10),
@@ -229,10 +237,10 @@ class JobCardWidget extends StatelessWidget {
                             child: CustomIconWidget(
                               iconName: 'location_on',
                               color: Colors.white,
-                              size: 20,
+                              size: isSmallScreen ? 16 : 20,
                             ),
                           ),
-                          SizedBox(width: 3.w),
+                          SizedBox(width: 2.5.w),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,17 +250,19 @@ class JobCardWidget extends StatelessWidget {
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: Colors.green.shade700,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 11 : null,
                                   ),
                                 ),
-                                SizedBox(height: 0.5.h),
+                                SizedBox(height: 0.2.h),
                                 Text(
                                   jobData['location'] as String? ??
                                       'Not specified',
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     color: Colors.green.shade800,
                                     fontWeight: FontWeight.w700,
+                                    fontSize: isSmallScreen ? 12 : null,
                                   ),
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
@@ -261,14 +271,14 @@ class JobCardWidget extends StatelessWidget {
                         ],
                       ),
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 1.h : 2.h),
+                    SizedBox(height: isSmallScreen ? 0.8.h : 1.5.h),
 
-                    // EXPERIENCE & WORK MODE
+                    // Experience and Work Mode - Compact row layout
                     Row(
                       children: [
                         Expanded(
                           child: Container(
-                            padding: EdgeInsets.all(2.5.w),
+                            padding: EdgeInsets.all(isSmallScreen ? 2.w : 2.5.w),
                             decoration: BoxDecoration(
                               color: Colors.green.shade50,
                               borderRadius: BorderRadius.circular(12),
@@ -285,16 +295,20 @@ class JobCardWidget extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: Colors.green.shade600,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 10 : null,
                                   ),
                                 ),
-                                SizedBox(height: 0.5.h),
+                                SizedBox(height: 0.2.h),
                                 Text(
                                   jobData['experience'] as String? ??
                                       'Not specified',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: Colors.green.shade800,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 11 : null,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
@@ -303,7 +317,7 @@ class JobCardWidget extends StatelessWidget {
                         SizedBox(width: 2.w),
                         Expanded(
                           child: Container(
-                            padding: EdgeInsets.all(2.5.w),
+                            padding: EdgeInsets.all(isSmallScreen ? 2.w : 2.5.w),
                             decoration: BoxDecoration(
                               color: Colors.green.shade50,
                               borderRadius: BorderRadius.circular(12),
@@ -320,16 +334,21 @@ class JobCardWidget extends StatelessWidget {
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: Colors.green.shade600,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 10 : null,
                                   ),
                                 ),
-                                SizedBox(height: 0.5.h),
+                                SizedBox(height: 0.2.h),
                                 Text(
                                   jobData['workMode'] as String? ??
-                                      'Not specified',
+                                      jobData['work_mode'] as String? ??
+                                      'remote',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: Colors.green.shade800,
                                     fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 11 : null,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
@@ -337,12 +356,12 @@ class JobCardWidget extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 1.h : 2.h),
+                    SizedBox(height: isSmallScreen ? 0.8.h : 1.5.h),
 
-                    // Match reason - Why this job matches
+                    // Match reason - Compact design
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.all(3.w),
+                      padding: EdgeInsets.all(isSmallScreen ? 2.5.w : 3.w),
                       decoration: BoxDecoration(
                         color: matchColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
@@ -357,7 +376,7 @@ class JobCardWidget extends StatelessWidget {
                           Row(
                             children: [
                               Container(
-                                padding: EdgeInsets.all(1.w),
+                                padding: EdgeInsets.all(isSmallScreen ? 0.8.w : 1.w),
                                 decoration: BoxDecoration(
                                   color: matchColor,
                                   borderRadius: BorderRadius.circular(8),
@@ -365,42 +384,48 @@ class JobCardWidget extends StatelessWidget {
                                 child: CustomIconWidget(
                                   iconName: 'psychology',
                                   color: Colors.white,
-                                  size: 16,
+                                  size: isSmallScreen ? 14 : 16,
                                 ),
                               ),
                               SizedBox(width: 2.w),
-                              Text(
-                                'Why this matches you',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: matchColor,
-                                  fontWeight: FontWeight.w700,
+                              Expanded(
+                                child: Text(
+                                  'Why this matches you',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: matchColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 11 : null,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 1.h),
+                          SizedBox(height: 0.5.h),
                           Text(
                             matchReason,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.w500,
-                              height: 1.3,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: matchColor,
+                              fontSize: isSmallScreen ? 10 : null,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 0.8.h : 1.5.h),
 
-                    // Match tier text
+                    // Match tier badge - Compact
+                    SizedBox(height: isSmallScreen ? 0.5.h : 1.h),
                     Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 3.w,
+                        vertical: 0.5.h,
+                      ),
                       decoration: BoxDecoration(
-                        color: matchColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
+                        color: matchColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: matchColor.withValues(alpha: 0.3),
+                          color: matchColor.withValues(alpha: 0.5),
                           width: 1,
                         ),
                       ),
@@ -409,90 +434,94 @@ class JobCardWidget extends StatelessWidget {
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: matchColor,
                           fontWeight: FontWeight.w600,
+                          fontSize: isSmallScreen ? 10 : null,
                         ),
                       ),
                     ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 1.h : 2.h),
+                    SizedBox(height: isSmallScreen ? 0.8.h : 1.5.h),
 
-                    // Skills chips - condensed view
-                    if (jobData['skills'] != null)
-                      SizedBox(
-                        width: double.infinity,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Required Skills',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(height: 1.h),
-                            Wrap(
-                              spacing: 2.w,
-                              runSpacing: 1.h,
-                              children:
-                                  ((jobData['skills'] as List?)?.take(5) ?? [])
-                                      .map<Widget>((skill) => Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 2.5.w,
-                                              vertical: 0.8.h,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.green.shade100,
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              border: Border.all(
-                                                color: Colors.green.shade300,
-                                                width: 1,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              skill.toString(),
-                                              style: theme.textTheme.labelSmall
-                                                  ?.copyWith(
-                                                color: Colors.green.shade700,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ))
-                                      .toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    SizedBox(height: MediaQuery.of(context).size.height < 700 ? 0.5.h : 1.h),
-
-                    // Swipe up hint
-                    Center(
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 4.w, vertical: MediaQuery.of(context).size.height < 700 ? 0.5.h : 1.h),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade200.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CustomIconWidget(
-                              iconName: 'keyboard_arrow_up',
+                    // Skills chips - condensed view (only show on larger screens or limit to 3)
+                    if (jobData['skills'] != null && (!isSmallScreen || topSkills.isNotEmpty))
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Required Skills',
+                            style: theme.textTheme.labelMedium?.copyWith(
                               color: Colors.green.shade700,
-                              size: 20,
+                              fontWeight: FontWeight.w600,
+                              fontSize: isSmallScreen ? 11 : null,
                             ),
-                            SizedBox(width: 1.w),
-                            Text(
-                              'Swipe up for more details',
-                              style: theme.textTheme.labelSmall?.copyWith(
+                          ),
+                          SizedBox(height: 0.5.h),
+                          Wrap(
+                            spacing: 1.5.w,
+                            runSpacing: 0.5.h,
+                            children:
+                                ((jobData['skills'] as List?)?.take(isSmallScreen ? 3 : 5) ?? [])
+                                    .map<Widget>((skill) => Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 2.w,
+                                            vertical: 0.4.h,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.shade100,
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: Colors.green.shade300,
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            skill.toString(),
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: Colors.green.shade700,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: isSmallScreen ? 9 : null,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
+                          ),
+                        ],
+                      ),
+                    SizedBox(height: isSmallScreen ? 0.5.h : 1.h),
+
+                    // Swipe up hint - Only show on larger screens
+                    if (!isSmallScreen)
+                      Center(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 4.w, vertical: 0.8.h),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade200.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CustomIconWidget(
+                                iconName: 'keyboard_arrow_up',
                                 color: Colors.green.shade700,
-                                fontWeight: FontWeight.w500,
+                                size: 18,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 1.w),
+                              Text(
+                                'Swipe up for more details',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    
+                    // Bottom padding
+                    SizedBox(height: isSmallScreen ? 0.5.h : 1.h),
                   ],
                 ),
               ),

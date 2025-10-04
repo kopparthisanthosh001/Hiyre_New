@@ -1,9 +1,5 @@
-import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:sizer/sizer.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -24,92 +20,10 @@ class ResumeUploadWidget extends StatefulWidget {
 }
 
 class _ResumeUploadWidgetState extends State<ResumeUploadWidget> {
-  List<CameraDescription>? _cameras;
-  CameraController? _cameraController;
-  bool _isCameraInitialized = false;
-  bool _showCamera = false;
-  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void dispose() {
-    _cameraController?.dispose();
     super.dispose();
-  }
-
-  Future<bool> _requestCameraPermission() async {
-    if (kIsWeb) return true;
-    return (await Permission.camera.request()).isGranted;
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      _cameras = await availableCameras();
-      if (_cameras!.isEmpty) return;
-
-      final camera = kIsWeb
-          ? _cameras!.firstWhere(
-              (c) => c.lensDirection == CameraLensDirection.front,
-              orElse: () => _cameras!.first)
-          : _cameras!.firstWhere(
-              (c) => c.lensDirection == CameraLensDirection.back,
-              orElse: () => _cameras!.first);
-
-      _cameraController = CameraController(
-          camera, kIsWeb ? ResolutionPreset.medium : ResolutionPreset.high);
-
-      await _cameraController!.initialize();
-      await _applySettings();
-
-      setState(() {
-        _isCameraInitialized = true;
-      });
-    } catch (e) {
-      setState(() {
-        _isCameraInitialized = false;
-      });
-    }
-  }
-
-  Future<void> _applySettings() async {
-    if (_cameraController == null) return;
-
-    try {
-      await _cameraController!.setFocusMode(FocusMode.auto);
-    } catch (e) {}
-
-    if (!kIsWeb) {
-      try {
-        await _cameraController!.setFlashMode(FlashMode.auto);
-      } catch (e) {}
-    }
-  }
-
-  Future<void> _captureDocument() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
-
-    try {
-      final XFile photo = await _cameraController!.takePicture();
-
-      // Convert XFile to PlatformFile for consistency
-      final bytes = await photo.readAsBytes();
-      final platformFile = PlatformFile(
-        name: 'scanned_document_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        size: bytes.length,
-        bytes: bytes,
-        path: kIsWeb ? null : photo.path,
-      );
-
-      setState(() {
-        _showCamera = false;
-      });
-
-      widget.onFileSelected(platformFile);
-      _cameraController?.dispose();
-    } catch (e) {
-      // Handle error silently
-    }
   }
 
   Future<void> _pickFile() async {
@@ -122,29 +36,6 @@ class _ResumeUploadWidgetState extends State<ResumeUploadWidget> {
 
       if (result != null && result.files.isNotEmpty) {
         widget.onFileSelected(result.files.first);
-      }
-    } catch (e) {
-      // Handle error silently
-    }
-  }
-
-  Future<void> _pickFromGallery() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        final platformFile = PlatformFile(
-          name: 'resume_image_${DateTime.now().millisecondsSinceEpoch}.jpg',
-          size: bytes.length,
-          bytes: bytes,
-          path: kIsWeb ? null : image.path,
-        );
-
-        widget.onFileSelected(platformFile);
       }
     } catch (e) {
       // Handle error silently
@@ -194,7 +85,7 @@ class _ResumeUploadWidgetState extends State<ResumeUploadWidget> {
               ),
               SizedBox(height: 3.h),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildUploadOption(
                     icon: 'description',
@@ -203,29 +94,6 @@ class _ResumeUploadWidgetState extends State<ResumeUploadWidget> {
                     onTap: () {
                       Navigator.pop(context);
                       _pickFile();
-                    },
-                  ),
-                  _buildUploadOption(
-                    icon: 'camera_alt',
-                    label: 'Camera',
-                    subtitle: 'Scan document',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      if (await _requestCameraPermission()) {
-                        await _initializeCamera();
-                        setState(() {
-                          _showCamera = true;
-                        });
-                      }
-                    },
-                  ),
-                  _buildUploadOption(
-                    icon: 'photo_library',
-                    label: 'Gallery',
-                    subtitle: 'Select image',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pickFromGallery();
                     },
                   ),
                 ],
@@ -304,120 +172,6 @@ class _ResumeUploadWidgetState extends State<ResumeUploadWidget> {
     );
   }
 
-  Widget _buildCameraView() {
-    if (!_isCameraInitialized || _cameraController == null) {
-      return Container(
-        height: 60.h,
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
-
-    return Container(
-      height: 60.h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: CameraPreview(_cameraController!),
-          ),
-          // Document frame overlay
-          Center(
-            child: Container(
-              width: 80.w,
-              height: 50.h,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Container(
-                margin: EdgeInsets.all(2.w),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.5), width: 1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 4.h,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.h),
-              margin: EdgeInsets.symmetric(horizontal: 4.w),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Position your resume within the frame',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 4.h,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _showCamera = false;
-                    });
-                    _cameraController?.dispose();
-                  },
-                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                ),
-                GestureDetector(
-                  onTap: _captureDocument,
-                  child: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                    ),
-                    child: Container(
-                      margin: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _pickFromGallery,
-                  icon: const Icon(Icons.photo_library,
-                      color: Colors.white, size: 32),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _getFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -442,15 +196,6 @@ class _ResumeUploadWidgetState extends State<ResumeUploadWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (_showCamera) {
-      return Column(
-        children: [
-          _buildCameraView(),
-          SizedBox(height: 2.h),
-        ],
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

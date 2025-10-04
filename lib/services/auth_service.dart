@@ -1,19 +1,19 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/error_handler.dart';
-import './supabase_service.dart';
 
 class AuthService {
   static AuthService? _instance;
   static AuthService get instance => _instance ??= AuthService._();
   AuthService._();
 
-  SupabaseClient get _client => SupabaseService.instance.client;
+  SupabaseClient get _client => Supabase.instance.client;
+  SupabaseClient get supabase => _client; // Add this getter
 
   // Get current user
   User? get currentUser => _client.auth.currentUser;
 
   // Send OTP to email with better error handling
-  Future<void> signInWithOtp({required String email}) async {
+  Future<void> sendOTP(String email) async {
     try {
       await _client.auth.signInWithOtp(email: email);
     } on AuthException catch (e) {
@@ -24,16 +24,17 @@ class AuthService {
   }
 
   // Verify OTP with better error handling
-  Future<AuthResponse> verifyOtp({
+  Future<AuthResponse> verifyOTP({
     required String email,
     required String token,
   }) async {
     try {
       final response = await _client.auth.verifyOTP(
-        email: email,
-        token: token,
         type: OtpType.email,
+        token: token,
+        email: email,
       );
+      
       return response;
     } on AuthException catch (e) {
       throw Exception(_getAuthErrorMessage(e));
@@ -49,7 +50,7 @@ class AuthService {
 
     try {
       final response = await _client
-          .from('user_profiles')
+          .from('users')
           .select()
           .eq('id', user.id)
           .single();
@@ -59,65 +60,99 @@ class AuthService {
     }
   }
 
-  // Sign up method with users table sync
+  // Sign up with email and password - UPDATED VERSION
   Future<AuthResponse> signUp({
     required String email,
     required String password,
     required String fullName,
-    required String role,
     String? phone,
+    String? role, // Add role parameter
   }) async {
     try {
-      // First, create user in Supabase Auth
+      print('🔄 Starting signup process...');
+      
+      // Step 1: Create user in Supabase Auth
       final response = await _client.auth.signUp(
         email: email,
         password: password,
         data: {
           'full_name': fullName,
-          'role': role,
+          'phone': phone,
+          'role': role ?? 'job_seeker', // Include role in metadata
         },
       );
 
-      // If signup successful and user is created, sync with users table
+      print('✅ Auth user created: ${response.user?.id}');
+
+      // Step 2: Sync with users table (only if auth user was created)
       if (response.user != null) {
-        await _syncUserToCustomTable(
-          userId: response.user!.id,
-          email: email,
-          fullName: fullName,
-          role: role,
-          phone: phone,
-        );
+        await _syncUserToCustomTable(response.user!);
       }
 
       return response;
     } catch (error) {
+      print('❌ Signup failed: $error');
       throw Exception('Sign up failed: $error');
     }
   }
 
-  // Private method to sync auth user with custom users table
-  Future<void> _syncUserToCustomTable({
-    required String userId,
-    required String email,
-    required String fullName,
-    required String role, // Keep parameter for compatibility but don't use in insert
-    String? phone,
-  }) async {
+  // IMPROVED: More robust user sync with better error handling
+  Future<void> _syncUserToCustomTable(User user) async {
     try {
-      await _client.from('users').insert({
-        'id': userId, // Use the same UUID from auth.users
-        'email': email,
-        'full_name': fullName,
-        // 'role': role, // Remove this line - role column doesn't exist in users table
-        'phone': phone,
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } catch (error) {
-      // If users table insert fails, we should clean up the auth user
-      // But for now, we'll just log the error
-      print('Warning: Failed to sync user to custom table: $error');
-      throw Exception('Failed to create user profile: $error');
+      // First check if user already exists
+      final existingUser = await _client
+          .from('users')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+  
+      if (existingUser != null) {
+        print('User already exists in custom table');
+        return;
+      }
+  
+      // Try to use the RPC function first (recommended approach)
+      try {
+        final result = await _client.rpc(
+          'create_user_profile',
+          params: {
+            'user_id': user.id,
+            'user_email': user.email ?? '',
+            'user_full_name': user.userMetadata?['full_name'] ?? '',
+            'user_phone': user.phone ?? '',
+          },
+        );
+        
+        print('User profile created via RPC function: $result');
+        return;
+      } catch (rpcError) {
+        print('RPC function failed, trying direct insert: $rpcError');
+        
+        // Fallback to direct insert (should work after RLS fix)
+        final userData = {
+          'id': user.id,
+          'email': user.email ?? '',
+          'full_name': user.userMetadata?['full_name'] ?? '',
+          'phone': user.phone ?? '',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+  
+        await _client.from('users').insert(userData);
+        print('User profile created via direct insert');
+      }
+    } catch (e) {
+      print('Error syncing user to custom table: $e');
+      
+      // Check if it's a duplicate key error (user already exists)
+      if (e.toString().contains('duplicate key') || 
+          e.toString().contains('already exists')) {
+        print('User already exists, continuing...');
+        return;
+      }
+      
+      // For other errors, rethrow
+      rethrow;
     }
   }
 
@@ -137,19 +172,21 @@ class AuthService {
     }
   }
 
-  // Sign in with Google
+  // Sign in with Google - CORRECTED return type
   Future<bool> signInWithGoogle() async {
     try {
-      return await _client.auth.signInWithOAuth(OAuthProvider.google);
+      final response = await _client.auth.signInWithOAuth(OAuthProvider.google);
+      return response;
     } catch (error) {
       throw Exception('Google sign in failed: $error');
     }
   }
 
-  // Sign in with Apple
+  // Sign in with Apple - CORRECTED return type  
   Future<bool> signInWithApple() async {
     try {
-      return await _client.auth.signInWithOAuth(OAuthProvider.apple);
+      final response = await _client.auth.signInWithOAuth(OAuthProvider.apple);
+      return response;
     } catch (error) {
       throw Exception('Apple sign in failed: $error');
     }
@@ -164,7 +201,7 @@ class AuthService {
     }
   }
 
-  // Reset password
+  // Reset password - FIXED method signature
   Future<void> resetPassword({required String email}) async {
     try {
       await _client.auth.resetPasswordForEmail(email);
@@ -174,7 +211,9 @@ class AuthService {
   }
 
   // Update password
-  Future<UserResponse> updatePassword({required String password}) async {
+  Future<UserResponse> updatePassword({
+    required String password,
+  }) async {
     try {
       final response = await _client.auth.updateUser(
         UserAttributes(password: password),
@@ -194,7 +233,7 @@ class AuthService {
 
     try {
       final response = await _client
-          .from('user_profiles')
+          .from('users')
           .update(updates)
           .eq('id', user.id)
           .select()
@@ -210,7 +249,7 @@ class AuthService {
     try {
       final profile = await getCurrentUserProfile();
       if (profile == null) return false;
-      return profile['profile_completed'] == true;
+      return profile['full_name'] != null && profile['email'] != null;
     } catch (error) {
       return false;
     }
@@ -219,22 +258,16 @@ class AuthService {
   // Listen to auth state changes
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
-  // Get auth token
-  Future<String?> getAccessToken() async {
-    final session = _client.auth.currentSession;
-    return session?.accessToken;
-  }
-
   String _getAuthErrorMessage(AuthException e) {
-    switch (e.message) {
-      case 'Invalid login credentials':
-        return 'Invalid email or password. Please try again.';
-      case 'Email not confirmed':
-        return 'Please verify your email before signing in.';
-      case 'Too many requests':
-        return 'Too many attempts. Please wait before trying again.';
-      case 'Invalid OTP':
-        return 'Invalid verification code. Please check and try again.';
+    switch (e.statusCode) {
+      case '400':
+        return 'Invalid email or password format.';
+      case '422':
+        return 'Email already registered or invalid.';
+      case '429':
+        return 'Too many requests. Please wait before trying again.';
+      case '500':
+        return 'Server error. Please try again later.';
       default:
         return e.message ?? 'Authentication failed. Please try again.';
     }

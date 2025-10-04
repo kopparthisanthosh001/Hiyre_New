@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:sizer/sizer.dart'; // Add this import for responsive extensions
+// Add this import for responsive extensions
 import 'package:fluttertoast/fluttertoast.dart'; // Add this import
 
 import '../../core/app_export.dart';
-import '../../core/error_handler.dart'; // Add this import
-import '../../services/auth_service.dart'; // ADD THIS LINE
+// Add this import
+// ADD THIS LINE
 import '../../widgets/custom_icon_widget.dart';
 import './widgets/demo_account_button.dart';
 import './widgets/email_input_field.dart';
@@ -15,6 +15,7 @@ import './widgets/resend_timer.dart';
 import './widgets/send_otp_button.dart';
 import './widgets/social_login_buttons.dart';
 import './widgets/verify_otp_button.dart';
+import '../../services/auth_service.dart';
 
 enum AuthenticationState {
   emailInput,
@@ -131,8 +132,7 @@ class _AuthenticationState extends State<Authentication>
     });
 
     try {
-      // Simulate OTP sending
-      await Future.delayed(const Duration(seconds: 2));
+      await AuthService.instance.sendOTP(email);
 
       setState(() {
         _isEmailLoading = false;
@@ -144,11 +144,12 @@ class _AuthenticationState extends State<Authentication>
       HapticFeedback.mediumImpact();
       _showToast('OTP sent to $email');
     } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _isEmailLoading = false;
-        _emailError = 'Failed to send OTP. Please try again.';
+        _emailError = message.isNotEmpty ? message : 'Failed to send OTP. Please try again.';
       });
-      _showToast('Failed to send OTP', isError: true);
+      _showToast(_emailError ?? 'Failed to send OTP', isError: true);
     }
   }
 
@@ -166,8 +167,8 @@ class _AuthenticationState extends State<Authentication>
     });
 
     try {
-      // Simulate OTP verification
-      await Future.delayed(const Duration(seconds: 2));
+      final email = _emailController.text.trim();
+      await AuthService.instance.verifyOTP(email: email, token: otp);
 
       setState(() => _isOtpLoading = false);
 
@@ -180,11 +181,12 @@ class _AuthenticationState extends State<Authentication>
         Navigator.pushReplacementNamed(context, '/domain-selection');
       }
     } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _isOtpLoading = false;
-        _otpError = 'Invalid OTP. Please try again.';
+        _otpError = message.isNotEmpty ? message : 'Invalid OTP. Please try again.';
       });
-      _showToast('Invalid OTP', isError: true);
+      _showToast(_otpError ?? 'Invalid OTP', isError: true);
     }
   }
 

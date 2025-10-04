@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_export.dart';
+import '../../services/auth_service.dart';
+import '../../services/profile_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -45,14 +47,103 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Start animations
     _animationController.forward();
+    
+    // Check authentication status after animation completes
+    _animationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _checkAuthenticationStatus();
+      }
+    });
+  }
+  
+  Future<void> _checkAuthenticationStatus() async {
+    try {
+      final currentUser = AuthService.instance.currentUser;
+
+      if (currentUser != null) {
+        // User is already signed in, check their profile
+        final profile = await ProfileService.instance.getUserProfile();
+
+        if (profile != null) {
+          // Check if user has selected domains
+          final selectedDomains = profile['selected_domains'] as List<dynamic>?;
+
+          if (selectedDomains != null && selectedDomains.isNotEmpty) {
+            // User has completed domain selection, check profile completeness
+            if (_isProfileComplete(profile)) {
+              // Profile is complete, go to job swipe deck
+              Navigator.pushReplacementNamed(context, AppRoutes.jobSwipeDeck);
+            } else {
+              // Profile incomplete, go to profile creation
+              Navigator.pushReplacementNamed(context, AppRoutes.profileCreation);
+            }
+          } else {
+            // User hasn't selected domains yet, go to domain selection
+            Navigator.pushReplacementNamed(context, AppRoutes.domainSelection);
+          }
+        } else {
+          // No profile found, go to domain selection
+          Navigator.pushReplacementNamed(context, AppRoutes.domainSelection);
+        }
+      } else {
+        // User not signed in, go to signup
+        Navigator.pushReplacementNamed(context, AppRoutes.authentication);
+      }
+      // If user is not signed in, stay on splash screen and wait for user action
+    } catch (error) {
+      print('Error checking authentication status: $error');
+      // On error, stay on splash screen
+    }
   }
 
   Future<void> _onSwipeJobsPressed() async {
-    // Navigate directly to domain selection when button is pressed
-    Navigator.pushReplacementNamed(
-      context,
-      AppRoutes.domainSelection,
-    );
+    // Check authentication status first
+    final currentUser = AuthService.instance.currentUser;
+    
+    if (currentUser == null) {
+      // User not authenticated - go to signup
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.authentication,
+      );
+      return;
+    }
+    
+    // User is authenticated - check if they have completed domain selection
+    try {
+      final profile = await ProfileService.instance.getUserProfile();
+      
+      if (profile != null && profile['selected_domains'] != null && 
+          (profile['selected_domains'] as List).isNotEmpty) {
+        // User has selected domains - check if profile is complete
+        if (_isProfileComplete(profile)) {
+          // Profile complete - go to job swipe deck
+          Navigator.pushReplacementNamed(
+            context,
+            AppRoutes.jobSwipeDeck,
+          );
+        } else {
+          // Profile incomplete - go to profile creation
+          Navigator.pushReplacementNamed(
+            context,
+            AppRoutes.profileCreation,
+          );
+        }
+      } else {
+        // User hasn't selected domains yet - go to domain selection
+        Navigator.pushReplacementNamed(
+          context,
+          AppRoutes.domainSelection,
+        );
+      }
+    } catch (e) {
+      print('Error checking user profile: $e');
+      // On error, go to domain selection as fallback
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.domainSelection,
+      );
+    }
   }
   
   bool _isProfileComplete(Map<String, dynamic> profile) {
